@@ -4,14 +4,12 @@ using UnityEngine;
 
 public class Intersector
 {
-    public OctreeTransform transform;
+    //public OctreeTransform transform;
     public Triangle triangle;
     public AABB aabb;
     public bool isBound;
 
     public int triNumber;
-
-    public string intersectionInfo = "No test has been done.";
 
     public Intersector(Triangle triangle, Vector3 fromCenter)
     {
@@ -44,7 +42,7 @@ public class Intersector
     public Intersector(OctreeTransform transform)
     {
         isBound = true;
-        this.transform = transform;
+        //this.transform = transform;
         aabb = AABB.FromSide(transform.worldPos, transform.worldScale/2);
     }
 
@@ -60,28 +58,20 @@ public class Intersector
             {
                 if (FinalIntersection(bound, meshTriangle.triangle))
                 {
-                    a.intersectionInfo = "OK";
-                    b.intersectionInfo = "OK";
                     return true;
                 }
                 else
                 {
-                    a.intersectionInfo = "FinalIntersection test reject";
-                    b.intersectionInfo = "FinalIntersection test reject";
                     return false;
                 }
             }
             else
             {
-                a.intersectionInfo = "PlaneAABBIntersection test reject";
-                b.intersectionInfo = "PlaneAABBIntersection test reject";
                 return false;
             }
         }
         else
         {
-            a.intersectionInfo = "BoundBoundIntersection test reject";
-            b.intersectionInfo = "BoundBoundIntersection test reject";
             return false;
         }
     }

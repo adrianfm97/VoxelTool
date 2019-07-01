@@ -7,22 +7,21 @@ using EditorCoroutines;
 [ExecuteInEditMode]
 public class VoxelSystem : MonoBehaviour
 {
-    [Range(0,10)]
+    [Range(0,8)]
     public int _Depth;
     public GameObject _Mesh;
     public bool _DebugDisplay = false;
     public Color _Color;
-    //public Transform transform;
 
     private int showedSubdivision;
-    int prevShowedSubdivision;
     private Octree octree;
-
-    Mesh debug_Mesh;
-    bool debug_Drawing = false;
-    Vector3Int debugAux = new Vector3Int();
-
-    public Transform indexCheckerTransform; 
+    [HideInInspector]
+    public static OctreeNode[,,] kNodes;
+    [HideInInspector]
+    public bool voxelizationDone;
+    
+    MeshFilter filter;
+    MeshRenderer renderer;
 
     public void Update()
     {
@@ -31,27 +30,17 @@ public class VoxelSystem : MonoBehaviour
             octree = new Octree();
             
         }
-        if (octree.root != null && transform.hasChanged)
-        {
-            print("Refreshing");
-            //octree.Refresh(transform);
-        }
-        if (octree.root != null)
-        {
-            //CheckCube();
-        }
-        
     }
 
     private void OnValidate()
     {
         showedSubdivision = _Depth;
-        //GenerateMesh();
-        //nodes = GetKNodes(showedSubdivision);
     }
 
     private void OnDrawGizmos()
     {
+        Gizmos.color = Color.gray;
+        Gizmos.DrawWireCube(transform.position, transform.localScale);
         if (octree != null && octree.root != null) 
         {
             if(_DebugDisplay) octree.Display(showedSubdivision);
@@ -60,51 +49,92 @@ public class VoxelSystem : MonoBehaviour
 
     public void Create()
     {
+        octree = null;
+        System.GC.Collect();
         showedSubdivision = _Depth;
-        prevShowedSubdivision = showedSubdivision;
-        debugAux = Vector3Int.zero;
+        octree = new Octree();
         octree.Create(_Depth, transform);
+        kNodes = null;
+        transform.parent.GetComponent<MeshFilter>().sharedMesh = null;
     }
 
     public void Bake()
     {
         double bakingTimeCounter = EditorApplication.timeSinceStartup;
         octree.Bake(GetMeshTriangles(_Mesh));
-        print(EditorApplication.timeSinceStartup - bakingTimeCounter);
+        print("BakeTime: " + (EditorApplication.timeSinceStartup - bakingTimeCounter));
     }
 
     public void FloodFill()
     {
-        Vector3 pos = indexCheckerTransform.position;
-        octree.Flood(pos);
+        Filler[] fillers = GetFillers();
+        if (fillers.Length == 0)
+        {
+            Debug.LogWarning("You don't have any filler GameObject as children of Fillers.");
+            return;
+        }
+        for (int i = 0; i < fillers.Length; i++)
+        {
+            if (fillers[i].isFullFill)
+            {
+                FloodFill(fillers[i].transform.position);
+            }
+        }
+        UpdateMesh();
     }
 
-    public void DebugDraw()
+    public void FloodFill(Vector3 position)
     {
-        debug_Mesh = _Mesh.GetComponent<MeshFilter>().sharedMesh;
+        octree.FloodFill(position);
+    }
+
+    public void FloodErase(Vector3 pos, int range)
+    {
+        octree.FloodErase(pos, range);
+        GenerateMesh();
+    }
+
+    public void FloodAtRange(Vector3 pos, int range)
+    {
+        octree.Flood(pos, range);
+        GenerateMesh();
+    }
+
+    public Filler[] GetFillers()
+    {
+        Transform[] go = transform.parent.GetComponentsInChildren<Transform>();
+        Filler[] fillers = new Filler[0];
+        for (int i = 0; i < go.Length; i++)
+        {
+            if (go[i].name == "Fillers")
+            {
+                fillers = go[i].gameObject.GetComponentsInChildren<Filler>();
+            }
+        }
+        return fillers;
     }
 
     public void GenerateMesh()
     {
-        OctreeNode[,,] nodes = GetKNodes(showedSubdivision);
-        print("Node legnth: " + nodes.Length);
-        MeshFilter filter = GetComponent<MeshFilter>();
-        MeshRenderer renderer = GetComponent<MeshRenderer>();
+        kNodes = GetKNodes(showedSubdivision);
         Mesh mesh = new Mesh();
+
+        MeshFilter filter = transform.parent.GetComponent<MeshFilter>();
+        MeshRenderer renderer = transform.parent.GetComponent<MeshRenderer>();
 
         List<Vector3> vertices = new List<Vector3>();
         List<Vector3> scales = new List<Vector3>();
         List<int> indices = new List<int>();
-        for (int y = 0; y < nodes.GetLength(1); y++)
+        for (int y = 0; y < kNodes.GetLength(1); y++)
         {
-            for (int x = 0; x < nodes.GetLength(0); x++)
+            for (int x = 0; x < kNodes.GetLength(0); x++)
             {
-                for (int z = 0; z < nodes.GetLength(2); z++)
+                for (int z = 0; z < kNodes.GetLength(2); z++)
                 {
-                    if (nodes[x, y, z].isBorder) print("IsBorder = true");
-                    if (nodes[x, y, z].isBorder || nodes[x, y, z].isInner){
-                        vertices.Add(nodes[x, y, z].transform.worldPos);
-                        scales.Add(nodes[x, y, z].transform.worldScale);
+                    //if (nodes[x, y, z].isBorder) print("IsBorder = true");
+                    if (kNodes[x, y, z].isBorder /*|| kNodes[x, y, z].isInner*/){
+                        vertices.Add(kNodes[x, y, z].transform.worldPos);
+                        scales.Add(kNodes[x, y, z].transform.worldScale);
                         indices.Add(vertices.Count - 1);
                     }
                 }
@@ -113,7 +143,44 @@ public class VoxelSystem : MonoBehaviour
 
         mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         mesh.SetVertices(vertices);
-        print("Vertices[" + mesh.vertices.Length + "]");
+        mesh.SetNormals(scales);
+        mesh.SetIndices(indices.ToArray(), MeshTopology.Points, 0);
+        filter.sharedMesh = mesh;
+
+        Material mat = new Material(Shader.Find("Voxel/NewVoxelShader"));
+        mat.SetColor("_MainColor", _Color);
+        renderer.sharedMaterial = mat;
+    }
+
+    public void UpdateMesh()
+    {
+        Mesh mesh = new Mesh();
+
+        MeshFilter filter = transform.parent.GetComponent<MeshFilter>();
+        MeshRenderer renderer = transform.parent.GetComponent<MeshRenderer>();
+
+        List<Vector3> vertices = new List<Vector3>();
+        List<Vector3> scales = new List<Vector3>();
+        List<int> indices = new List<int>();
+        for (int y = 0; y < kNodes.GetLength(1); y++)
+        {
+            for (int x = 0; x < kNodes.GetLength(0); x++)
+            {
+                for (int z = 0; z < kNodes.GetLength(2); z++)
+                {
+                    //if (nodes[x, y, z].isBorder) print("IsBorder = true");
+                    if (kNodes[x, y, z].isBorder /*|| kNodes[x, y, z].isInner*/)
+                    {
+                        vertices.Add(kNodes[x, y, z].transform.worldPos);
+                        scales.Add(kNodes[x, y, z].transform.worldScale);
+                        indices.Add(vertices.Count - 1);
+                    }
+                }
+            }
+        }
+
+        mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        mesh.SetVertices(vertices);
         mesh.SetNormals(scales);
         mesh.SetIndices(indices.ToArray(), MeshTopology.Points, 0);
         filter.sharedMesh = mesh;
@@ -165,10 +232,5 @@ public class VoxelSystem : MonoBehaviour
             triangles.Add(new Triangle(tV));
         }
         return triangles;
-    }
-
-    public void CheckCube()
-    {
-        octree.GetNode(indexCheckerTransform.position, showedSubdivision).isSelected = true;
     }
 }

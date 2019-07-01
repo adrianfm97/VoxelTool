@@ -48,24 +48,5 @@ Shader "Voxel/NewVoxelShader"
 
 			ENDCG
 		}
-		Pass
-        {
-			Tags{"LightMode" = "ShadowCaster"}
-			
-			ZWrite On ZTest LEqual Cull Off
-
-            CGPROGRAM
-			#include "VoxelShadowKernel.cginc"
-			#include "UnityCG.cginc"
-
-			#pragma target 5.0
-
-			#pragma vertex SHADOW_VS_Main
-			#pragma fragment SHADOW_FS_Main
-			#pragma geometry SHADOW_GS_Main
-
-			ENDCG
-		}
     }
-
 }

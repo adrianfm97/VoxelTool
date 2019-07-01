@@ -80,14 +80,16 @@ public class Morton
 
     public static Vector3Int WorldToMortonIntPos(Vector3 worldPos, OctreeTransform nodeTransform)
     {
-        /*Debug.Log("ParamX: " + Mathf.InverseLerp(-nodeTransform.worldScale.x / 2, nodeTransform.worldScale.x / 2, worldPos.x));
-        Debug.Log("ParamY: " + Mathf.InverseLerp(-nodeTransform.worldScale.y / 2, nodeTransform.worldScale.y / 2, worldPos.y));
-        Debug.Log("ParamZ: " + Mathf.InverseLerp(-nodeTransform.worldScale.z / 2, nodeTransform.worldScale.z / 2, worldPos.z));*/
+        return WorldToMortonIntPos(worldPos, nodeTransform, 21);
+    }
 
+    public static Vector3Int WorldToMortonIntPos(Vector3 worldPos, OctreeTransform nodeTransform, int depth)
+    {
+        int maxCoord = (int) Mathf.Pow(2, depth)-1;
         return new Vector3Int(
-            (int)Mathf.Lerp(0, Mathf.Pow(2, 21) - 1, Mathf.InverseLerp(-nodeTransform.worldScale.x / 2, nodeTransform.worldScale.x / 2, worldPos.x)),
-            (int)Mathf.Lerp(0, Mathf.Pow(2, 21) - 1, Mathf.InverseLerp(-nodeTransform.worldScale.y / 2, nodeTransform.worldScale.y / 2, worldPos.y)),
-            (int)Mathf.Lerp(0, Mathf.Pow(2, 21) - 1, Mathf.InverseLerp(-nodeTransform.worldScale.z / 2, nodeTransform.worldScale.z / 2, worldPos.z))
+            (int)Mathf.Lerp(0, maxCoord, Mathf.InverseLerp(-nodeTransform.worldScale.x / 2, nodeTransform.worldScale.x / 2, worldPos.x)),
+            (int)Mathf.Lerp(0, maxCoord, Mathf.InverseLerp(-nodeTransform.worldScale.y / 2, nodeTransform.worldScale.y / 2, worldPos.y)),
+            (int)Mathf.Lerp(0, maxCoord, Mathf.InverseLerp(-nodeTransform.worldScale.z / 2, nodeTransform.worldScale.z / 2, worldPos.z))
         );
     }
 

@@ -42,7 +42,7 @@ v2g vert (appdata v)
 
 g2f createCubeVertex(v2g p, float4 vertex, float3 normal){
     g2f o;
-    float4 cubeVertex = float4((p.pos + vertex * p.scale),1);
+    float4 cubeVertex = p.pos + vertex * float4(p.scale,1);
     o.pos = UnityObjectToClipPos(cubeVertex);
     o.normal = UnityObjectToWorldNormal(normal);
     o.worldPos = mul(unity_ObjectToWorld, cubeVertex);
@@ -140,10 +140,8 @@ float4 frag (g2f i) : SV_Target
     );
 
     UnityIndirect indirectLight;
-    indirectLight.diffuse = 0;
+    indirectLight.diffuse = 0.3;
     indirectLight.specular = 0;
-
-    //return float4(i.worldPos,1);
 
     return UNITY_BRDF_PBS(
         albedo, specularTint,

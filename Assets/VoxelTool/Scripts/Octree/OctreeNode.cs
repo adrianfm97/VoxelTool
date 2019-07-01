@@ -7,15 +7,10 @@ using System;
 public class OctreeNode
 {
     public OctreeTransform transform;
-    public int k;
+    public byte k;
     public OctreeNode[] children;
     public OctreeNode father;
-    public OctreeIndex indexFromFather;
-    //public uint index;
     public Morton morton;
-
-    Intersector intersector;
-
 
     public bool isLeaf = true, isBorder = false, isInner = false, isSelected = false;
 
@@ -24,7 +19,6 @@ public class OctreeNode
         father = null;
         this.transform = transform;
         k = 0;
-        intersector = new Intersector(transform);
         morton = new Morton();
     }
 
@@ -32,8 +26,7 @@ public class OctreeNode
     {
         this.father = father;
         this.transform = transform;
-        this.k = k;
-        intersector = new Intersector(transform);
+        this.k = (byte)k;
         morton = new Morton(index);
     }
 
@@ -57,19 +50,21 @@ public class OctreeNode
 
     internal void Bake(List<Triangle> triangles)
     {
-        List<Triangle> tris = triangles;
         for (int i = 0; i < triangles.Count; i++)
         {
-            Intersector triangleIntersector = new Intersector(tris[i], -intersector.aabb.center, i);
-            bool intersects = Intersector.IntersectionTest(intersector, triangleIntersector);
+            bool intersects = Intersector.IntersectionTest(
+                                                           new Intersector(transform),
+                                                           new Intersector(triangles[i], -transform.worldPos, i)
+                                                           );
             if (intersects)
             {
                 isBorder = true;
                 if (!isLeaf)
                 {
+                    List<Triangle> newTris = triangles.GetRange(i, triangles.Count - i);
                     for (int j = 0; j < children.Length; j++)
                     {
-                        children[j].Bake(tris);
+                        children[j].Bake(newTris);
                     }
                 }
                 return;
@@ -80,7 +75,6 @@ public class OctreeNode
 
     public void IncreaseUntil(int maxDepth)
     {
-        //Octree.hashtable.Add(morton.mortonCode, this);
         if (k<=maxDepth)
         {
             if (children == null)
@@ -104,12 +98,25 @@ public class OctreeNode
         }
     }
 
-    public bool Flood()
+    public bool Flood(bool isBorder, bool isInner)
     {
-        //Debug.Log("Execution");
-        if (isBorder||isInner) return false;
-        isInner = true;
-        UpdateUpwards(isBorder, true);
+        if (this.isBorder||this.isInner) return false;
+        this.isBorder = isBorder;
+        this.isInner = isInner;
+        UpdateUpwards(isBorder, isInner);
+        return true;
+    }
+
+    public bool Erase(bool isBorder, bool isInner)
+    {
+        if (!this.isBorder && !this.isInner) return false;
+        if (isBorder)
+        {
+            if(this.isInner) this.isBorder = true;
+            return false;
+        }
+        else this.isBorder = false;
+        this.isInner = false;
         return true;
     }
 
@@ -133,6 +140,7 @@ public class OctreeNode
     {
         if (Octree.IsBaked)
         {
+            
             if (isSelected)
             {
                 Gizmos.color = Color.yellow;

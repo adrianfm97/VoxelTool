@@ -7,52 +7,94 @@ using System;
 [CustomEditor(typeof(VoxelSystem))]
 public class VoxelSystemEditor : Editor
 {
-    string DrawButtonsTitle = "Draw Bounds";
+    bool create = true;
+    bool bake = true;
+    bool generate = true;
+    bool fill = true;
+
+    private void Awake()
+    {
+        VoxelSystem myScript = (VoxelSystem)target;
+        create = EditorPrefs.GetBool("create", create);
+        bake = EditorPrefs.GetBool("bake", bake);
+        generate = EditorPrefs.GetBool("generate", generate);
+        fill = EditorPrefs.GetBool("fill", fill);
+
+        if (Application.isPlaying && !myScript.voxelizationDone)
+        {
+            myScript.voxelizationDone = true;
+            if (create)
+                myScript.Create();
+            if (bake)
+                myScript.Bake();
+            if (generate)
+                myScript.GenerateMesh();
+            if (fill)
+                myScript.FloodFill();
+        }
+    }
     public override void OnInspectorGUI()
     {
         DrawDefaultInspector();
+        EditorGUILayout.Separator();
+        EditorGUILayout.Separator();
+        EditorGUILayout.Separator();
 
-        
         VoxelSystem myScript = (VoxelSystem)target;
-        if (GUILayout.Button("Create"))
+
+        EditorGUI.DrawRect(EditorGUILayout.GetControlRect(false, 1), new Color(0.5f, 0.5f, 0.5f, 1));
+
+        EditorGUILayout.Separator();
+
+        create = EditorGUILayout.ToggleLeft("Create Structure", create);
+        if(create) bake = EditorGUILayout.ToggleLeft("Bake Mesh", bake);
+        if(create && bake) generate = EditorGUILayout.ToggleLeft("Generate Mesh", generate);
+        if(create && bake && generate) fill = EditorGUILayout.ToggleLeft("Flood Fill", fill);
+
+        EditorGUILayout.Space();
+
+        if (create && GUILayout.Button("Voxelize"))
         {
             myScript.Create();
+            if (bake)
+                myScript.Bake();
+            if (generate)
+                myScript.GenerateMesh();
+            if (fill)
+                myScript.FloodFill();
         }
-        if (GUILayout.Button("Bake"))
+        EditorGUILayout.Separator();
+        EditorGUI.DrawRect(EditorGUILayout.GetControlRect(false, 1), new Color(0.5f, 0.5f, 0.5f, 1));
+        EditorGUILayout.Separator();
+
+        Filler[] fillers = myScript.GetFillers();
+        for (int i = 0; i < fillers.Length; i++)
         {
-            myScript.Bake();
-        }
-        if (GUILayout.Button("Create&Bake&Mesh"))
-        {
-            myScript.Create();
-            myScript.Bake();
-            myScript.GenerateMesh();
-        }
-        if (GUILayout.Button(DrawButtonsTitle))
-        {
-            if(DrawButtonsTitle.Equals("Draw Bounds"))
+            if (GUILayout.Button("Activate filler " + (i+1) + " [\"" + fillers[i].name + "\"]"))
             {
-                DrawButtonsTitle = "Erase Bounds";
+                if (!fillers[i].isFullFill)
+                {
+                    if (fillers[i].erase)
+                    {
+                        myScript.FloodErase(fillers[i].transform.position, fillers[i].range);
+                    }
+                    else
+                    {
+                        myScript.FloodAtRange(fillers[i].transform.position, fillers[i].range);
+                    }
+                    
+                }
+                else
+                {
+                    myScript.FloodFill(fillers[i].transform.position);
+                }
             }
-            else
-            {
-                DrawButtonsTitle = "Draw Bounds";
-            }
-            //Debug.Log(DrawButtonsTitle);
-            myScript.DebugDraw();
         }
-        if (GUILayout.Button("FloodFill"))
-        {
-            myScript.FloodFill();
-        }
-        if (GUILayout.Button("Generate Mesh"))
-        {
-            myScript.GenerateMesh();
-        }
-        if (GUILayout.Button("CheckCube"))
-        {
-            myScript.CheckCube();
-            EditorApplication.QueuePlayerLoopUpdate();
-        }
+        EditorGUILayout.Separator();
+
+        EditorPrefs.SetBool("create", create);
+        EditorPrefs.SetBool("bake", bake);
+        EditorPrefs.SetBool("generate", generate);
+        EditorPrefs.SetBool("fill", fill);
     }
 }

@@ -26,8 +26,7 @@ public class Octree
 
     public Octree()
     {
-        //this.transform = transform;
-        
+
     }
 
     public void Create(int depth, Transform transform)
@@ -66,15 +65,14 @@ public class Octree
         root.Refresh();
     }
 
-    public void Flood(Vector3 pos)
+    public void FloodFill(Vector3 pos)
     {
-
         Stack<Vector3> stack = new Stack<Vector3>();
         stack.Push(pos);
         while (stack.Count > 0)
         {
             Vector3 currentPos = stack.Pop();
-            if (GetNode(currentPos, depth).Flood())
+            if (GetNode(currentPos, depth).Flood(false, true))
             {
                 Vector3 posTransformer = rootTransform.worldScale / Mathf.Pow(2, depth);
                 stack.Push(new Vector3(currentPos.x + posTransformer.x, currentPos.y, currentPos.z));
@@ -83,6 +81,76 @@ public class Octree
                 stack.Push(new Vector3(currentPos.x, currentPos.y - posTransformer.y, currentPos.z));
                 stack.Push(new Vector3(currentPos.x, currentPos.y, currentPos.z + posTransformer.z));
                 stack.Push(new Vector3(currentPos.x, currentPos.y, currentPos.z - posTransformer.z));
+            }
+        }
+    }
+
+    public void Flood(Vector3 pos, int range)
+    {
+        Stack<Vector3> stack = new Stack<Vector3>();
+        OctreeNode node = GetNode(pos, depth);
+        node.isSelected = true;
+        stack.Push(node.transform.worldPos);
+        Vector3Int mortonPos = Morton.WorldToMortonIntPos(node.transform.worldPos, root.transform, depth);
+        Debug.Log("MortonPos: " + mortonPos);
+        while (stack.Count > 0)
+        {
+            Vector3 currentPos = stack.Pop();
+            OctreeNode currentNode = GetNode(currentPos, depth);
+            Vector3Int currentMortonPos = Morton.WorldToMortonIntPos(currentPos, root.transform, depth);
+            if((currentMortonPos-mortonPos).magnitude <= range)
+            {
+                bool isBorder = ((currentMortonPos - mortonPos).magnitude) >= range-1 ||
+                                currentMortonPos.x == 0 || currentMortonPos.x == Mathf.Pow(2, depth)-2 ||
+                                currentMortonPos.y == 0 || currentMortonPos.y == Mathf.Pow(2, depth)-2 ||
+                                currentMortonPos.z == 0 || currentMortonPos.z == Mathf.Pow(2, depth)-2;
+                if (isBorder)
+                {
+                    VoxelSystem.kNodes[currentMortonPos.x, currentMortonPos.y, currentMortonPos.z] = currentNode;
+                }
+                if (currentNode.Flood(isBorder, !isBorder))
+                {
+                    Vector3 posTransformer = rootTransform.worldScale / (Mathf.Pow(2, depth)-1);
+                    stack.Push(new Vector3(currentPos.x + posTransformer.x, currentPos.y, currentPos.z));
+                    stack.Push(new Vector3(currentPos.x - posTransformer.x, currentPos.y, currentPos.z));
+                    stack.Push(new Vector3(currentPos.x, currentPos.y + posTransformer.y, currentPos.z));
+                    stack.Push(new Vector3(currentPos.x, currentPos.y - posTransformer.y, currentPos.z));
+                    stack.Push(new Vector3(currentPos.x, currentPos.y, currentPos.z + posTransformer.z));
+                    stack.Push(new Vector3(currentPos.x, currentPos.y, currentPos.z - posTransformer.z));
+                }
+            }
+        }
+    }
+    public void FloodErase(Vector3 pos, int range)
+    {
+        Stack<Vector3> stack = new Stack<Vector3>();
+        OctreeNode node = GetNode(pos, depth);
+        node.isSelected = true;
+        stack.Push(node.transform.worldPos);
+        Vector3Int mortonPos = Morton.WorldToMortonIntPos(node.transform.worldPos, root.transform, depth);
+        while (stack.Count > 0)
+        {
+            Vector3 currentPos = stack.Pop();
+            OctreeNode currentNode = GetNode(currentPos, depth);
+            Vector3Int currentMortonPos = Morton.WorldToMortonIntPos(currentPos, root.transform, depth);
+            if ((int)(currentMortonPos - mortonPos).magnitude <= range+1)
+            {
+                bool isBorder = ((int)(currentMortonPos - mortonPos).magnitude) >= range;
+                //Debug.Log(isBorder);
+                if (isBorder)
+                {
+                    VoxelSystem.kNodes[currentMortonPos.x, currentMortonPos.y, currentMortonPos.z] = currentNode;
+                }
+                if (currentNode.Erase(isBorder, false))
+                {
+                    Vector3 posTransformer = rootTransform.worldScale / Mathf.Pow(2, depth);
+                    stack.Push(new Vector3(currentPos.x + posTransformer.x, currentPos.y, currentPos.z));
+                    stack.Push(new Vector3(currentPos.x - posTransformer.x, currentPos.y, currentPos.z));
+                    stack.Push(new Vector3(currentPos.x, currentPos.y + posTransformer.y, currentPos.z));
+                    stack.Push(new Vector3(currentPos.x, currentPos.y - posTransformer.y, currentPos.z));
+                    stack.Push(new Vector3(currentPos.x, currentPos.y, currentPos.z + posTransformer.z));
+                    stack.Push(new Vector3(currentPos.x, currentPos.y, currentPos.z - posTransformer.z));
+                }
             }
         }
     }
